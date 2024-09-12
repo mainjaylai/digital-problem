@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="../static/echarts.min.js"></script>
+</head>
+
+<body>
+    <div class="all">
+        <div id="chat1" style="height: 600px; width: 600px;"></div>
+        <div id="chart2" style="height: 600px; width: 600px;"></div>
+    </div>
+</body>
+<script>
+    show1();
+    show2();
+    function show1() {
+        var chartDom = document.getElementById('chat1');
+        var myChart = echarts.init(chartDom);
+        var option;
+
+        option = {
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross',
+                    crossStyle: {
+                        color: '#999'
+                    }
+                }
+            },
+            toolbox: {
+                feature: {
+                    dataView: { show: true, readOnly: false },
+                    magicType: { show: true, type: ['bar'] },
+                    restore: { show: true },
+                    saveAsImage: { show: true }
+                }
+            },
+            legend: {
+                data: ['运行时间', '遍历次数']
+            },
+            xAxis: [
+                {
+                    type: 'category',
+                    data: ['DFS', 'BFS', 'A*', "B*"],
+                    axisPointer: {
+                        type: 'shadow'
+                    }
+                }
+            ],
+            yAxis: [
+                {
+                    type: 'value',
+                    name: '运行时间',
+                    min: 0,
+                    max: 2500,
+                    interval: 500,
+                    axisLabel: {
+                        formatter: '{value} ms'
+                    }
+                },
+                {
+                    type: 'value',
+                    name: '遍历次数',
+                    min: 0,
+                    max: 18000,
+                    interval: 2000,
+                    axisLabel: {
+                        formatter: '{value} 次'
+                    }
+                }
+            ],
+            series: [
+                {
+                    name: '运行时间',
+                    type: 'bar',
+                    data: [
+                        1978.6533763011296, 2445.9443283081055, 7.265257835388184, 106.34735107421875
+                    ]
+                },
+                {
+                    name: '遍历次数',
+                    type: 'bar',
+                    yAxisIndex: 1,
+                    data: [
+                        16205.1, 16386.34, 39.7, 503.4
+                    ]
+                }
+            ]
+        };
+
+        option && myChart.setOption(option);
+    }
+    function show2() {
+        var chartDom = document.getElementById('chart2');
+        var myChart = echarts.init(chartDom);
+        var option;
+
+        option = {
+            title: {
+                text: '内存占比图',
+                subtext: '单位(MB)',
+                left: 'center'
+            },
+            tooltip: {
+                trigger: 'item'
+            },
+            legend: {
+                orient: 'vertical',
+                left: 'left'
+            },
+            series: [
+                {
+                    type: 'pie',
+                    radius: '50%',
+                    data: [
+                        { value: 8.56765625, name: 'DFS' },
+                        { value: 43.70875, name: 'BFS' },
+                        { value: 9.193203125, name: 'A*' },
+                        { value: 14.33265625, name: 'B*' },
+                    ],
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowOffsetX: 0,
+                            shadowColor: 'rgba(0, 0, 0, 0.5)'
+                        }
+                    }
+                }
+            ]
+        };
+
+        option && myChart.setOption(option);
+
+    }
+</script>
+<style>
+    .all{
+        margin-top: 4%;
+        display: flex;
+    }
+    #chart2{
+        float: left;
+        margin-right: 0;
+        margin-left: auto;
+    }
+</style>
+
+</html>

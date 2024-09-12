@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="http://code.jquery.com/jquery-2.1.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+</head>
+
+<body>
+    <div class="game__main">
+        <div class="notification">
+            <p id="message"></p>
+        </div>
+        <div id="puzzle"><span id="cell-0-0" class="number light" style="left: 1px; top: 1px;">1</span><span
+                id="cell-0-1" class="number dark" style="left: 82px; top: 1px;">2</span><span id="cell-0-2"
+                class="number light" style="left: 163px; top: 1px;">3</span><span id="cell-0-3" class="number dark"
+                style="left: 244px; top: 1px;">4</span><span id="cell-1-0" class="number dark"
+                style="left: 1px; top: 82px;">5</span><span id="cell-1-1" class="number light"
+                style="left: 82px; top: 82px;">6</span><span id="cell-1-2" class="number dark"
+                style="left: 163px; top: 82px;">7</span><span id="cell-1-3" class="number light"
+                style="left: 244px; top: 82px;">8</span><span id="cell-2-0" class="number light"
+                style="left: 1px; top: 163px;">9</span><span id="cell-2-1" class="number dark"
+                style="left: 82px; top: 163px;">10</span><span id="cell-2-2" class="number light"
+                style="left: 163px; top: 163px;">11</span><span id="cell-2-3" class="number dark"
+                style="left: 244px; top: 163px;">12</span><span id="cell-3-0" class="number dark"
+                style="left: 1px; top: 244px;">13</span><span id="cell-3-1" class="number light"
+                style="left: 82px; top: 244px;">14</span><span id="cell-3-2" class="number dark"
+                style="left: 163px; top: 244px;">15</span><span id="cell-3-3" class="empty"
+                style="left: 244px; top: 244px;"></span></div>
+        <div id="controls">
+            <button id="solve" onclick="search()">搜索方案</button>
+            <button id="scramble" onclick="mess_up()">随机打乱</button>
+            <button onclick="solve_self()">自动解决</button>
+            <select id="methods">
+                <option value="DFS">DFS</option>
+                <option value="BFS">BFS</option>
+                <option value="A*">A*</option>
+                <option value="B*">B*</option>
+            </select>
+        </div>
+        {% verbatim %}
+        <div class="show-algos" id="algos" v-if="isShow">
+            <div class="algo" v-for="(value,key) in solu" :key="key">
+                <div class="memory">
+                    <p>{{ key }}</p>
+                </div>
+                <div class="memory">
+                    完成总步数:<p> {{ value["moves"].length - 1 }}</p>
+                </div>
+                <div class="memory">
+                    搜寻时间:<p> {{ value["time"] }}s</p>
+                </div>
+                <div class="memory">
+                    搜寻节点数:<p> {{ value["counts"] }}</p>
+                </div>
+                <div class="memory">
+                    内存占用:<p>{{ value["memory"] }}GB</p>
+                </div>
+            </div>
+        </div>
+        {% endverbatim %}
+        <div class="back">
+            <button onclick="relive()">复原</button>
+        </div>
+    </div>
+
+</body>
+<script type="text/javascript">
+    postions = {}
+    numbers = document.getElementsByClassName("number");
+    for (var i = 0; i < numbers.length; i++) {
+        postions[numbers[i].id] = [numbers[i].style.left, numbers[i].style.top];
+    }
+    var tempX;
+    var tempY;
+    var empty = document.getElementsByClassName("empty")[0];
+    postions[empty.id] = [empty.style.left, empty.style.top];
+    var direction = {
+        "up": [-1, 0],
+        "down": [1, 0],
+        "left": [0, -1],
+        "right": [0, 1],
+        "#": [0, 0]
+    }
+    var timer1;
+    var before = []
+    var app = new Vue({
+        el: '#algos',
+        data: {
+            solu: [],
+            isShow: false,
+        }
+    })
+    $('span').bind("click", function () {
+        var puzzle = event.target
+        if (can_move(puzzle)) {
+            swap(event.target);
+            console.log("finished")
+        }
+    });
+    function can_move(dom) {
+        var target = dom.id.split('-');
+        var zero = empty.id.split('-');
+        return Math.abs(zero[1] - target[1]) + Math.abs(zero[2] - target[2]) == 1
+    }
+    function swap(dom1) {
+        empty.style.display = "none";
+        tempX = dom1.style.left;
+        tempY = dom1.style.top;
+        moveElement(dom1.id, parseInt(empty.style.left), parseInt(empty.style.top), 0.005);
+    }
+    function moveElement(elementID, final_x, final_y, interval) {  //参数分别为id选择器的值，x 轴上目的位置，y轴上目的位置，函数执行的时间间隔
+        var elem = document.getElementById(elementID); //获取id，此处也即是message
+
+        var xpos = parseInt(elem.style.left); //获取初始，采用parsInt函数，将字符串变成数字。为什么要换成数字？原因是我们要将这个位置与目的位子进行比较
+        var ypos = parseInt(elem.style.top);
+
+        if (xpos < final_x) {  //位置比较，如果这个元素的位置小于目的位置，那么这个元素初始位置增加，
+            xpos++;
+        }
+        if (xpos > final_x) { //如果这个位置大于目的位置，那么初始位置 --“”
+            xpos--;
+        }
+        if (ypos > final_y) {
+            ypos--;
+        }
+        if (ypos < final_y) {
+            ypos++;
+        }
+        elem.style.left = xpos + "px";  //上面我们为了与目的位置进行比较而将初始位置变成数字，这样我们是无法改变元素样式的，所以我们这里加上"px";
+        elem.style.top = ypos + "px";
+
+        if (xpos == final_x && ypos == final_y) {
+            empty.style.left = tempX;
+            empty.style.top = tempY;
+            var temId = elementID;
+            elem.id = empty.id;
+            empty.id = temId;
+            empty.style.display = ""
+            return
+        }
+        var repeat = "moveElement('" + elementID + "',+" + final_x + "," + final_y + "," + interval + ")";
+        movment = setTimeout(repeat, interval); // setTImeout()函数，其意思是间隔interval（参数）时间调用一次repeat（函数，此处函数为moveElement()函数）;
+    }
+    function mess_up() {
+        $.ajax({
+            type: "GET",
+            url: "/mess",
+            data: {},
+            dataType: "json",
+            success: function (data) {
+                before = data
+                come_arr(data);
+            }
+        });
+
+    }
+    // function come_to_arr(data) {
+    //     numbers = document.getElementsByClassName("number");
+    //     for (var i = 0; i < numbers.length; i++) {
+    //         numbers[i].id = data[(i + 1).toString()];
+    //         numbers[i].style.left = postions[numbers[i].id][0];
+    //         numbers[i].style.top = postions[numbers[i].id][1];
+    //     }
+    //     empty.id = data["0"];
+    //     empty.style.left = postions[empty.id][0];
+    //     empty.style.top = postions[empty.id][1];
+    // }
+    function search() {
+        var source = [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 0]];
+        for (var i = 0; i < 4; i++) {
+            for (j = 0; j < 4; j++) {
+                var dom = document.getElementById("cell-" + i.toString() + "-" + j.toString());
+                var splits = dom.id.split('-');
+                if (dom.textContent == '') {
+                    source[parseInt(splits[1])][parseInt(splits[2])] = 0;
+                }
+                else {
+                    source[parseInt(splits[1])][parseInt(splits[2])] = parseInt(dom.textContent);
+                }
+            }
+        }
+        var msg = document.getElementById("message");
+        msg.innerText = "正在搜寻解决方案....."
+        before = source;
+        $.ajax({
+            type: "GET",
+            url: "/solve",
+            data: { "source": JSON.stringify(source) },
+            dataType: "json",
+            success: function (data) {
+                var msg = document.getElementById("message");
+                msg.innerText = "解决方案搜素完成";
+                // solve_puzzle();
+                app.solu = data;
+                app.isShow = true;
+            }
+        });
+    }
+
+    function solve_self() {
+        var value = $("#methods option:selected").val();
+        console.log(value);
+        var msg = document.getElementById("message");
+        msg.innerText = "正在自动完成";
+        solve_puzzle(app.solu[value]["moves"]);
+    }
+    function solve_puzzle(solution) {
+        var i = 1;
+        timer1 = setInterval(function () {
+            if (i == solution.length) {
+                clearTimeout(timer1);
+                var msg = document.getElementById("message");
+                msg.innerText = "方案完成";
+                return;
+            }
+            var splits = empty.id.split('-');
+            var x = parseInt(splits[1]) + direction[solution[i]][0];
+            var y = parseInt(splits[2]) + direction[solution[i]][1];
+            swap(document.getElementById("cell-" + x.toString() + "-" + y.toString()));
+            i++;
+        }, 500)
+
+    }
+    
+    function come_arr(arr) {
+        var data = {};
+        for (var i = 0; i < arr.length; i++) {
+            for (var j = 0; j < arr.length; j++)
+                data[arr[i][j].toString()] = "cell-" + i.toString() + "-" + j.toString();
+        }
+        numbers = document.getElementsByClassName("number");
+        for (var i = 0; i < numbers.length; i++) {
+            numbers[i].id = data[(i + 1).toString()];
+            numbers[i].style.left = postions[numbers[i].id][0];
+            numbers[i].style.top = postions[numbers[i].id][1];
+        }
+        empty.id = data["0"];
+        empty.style.left = postions[empty.id][0];
+        empty.style.top = postions[empty.id][1];
+    }
+    function relive(){
+        come_arr(before);
+    }
+</script>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        vertical-align: baseline;
+    }
+
+    #game__main {
+        justify-content: center;
+        align-items: center;
+    }
+
+    #puzzle {
+        margin: auto;
+        margin-top: 10px;
+        position: relative;
+        width: 325px;
+        height: 325px;
+        border: 8px solid #001F1F;
+        display: block;
+    }
+
+    #puzzle span {
+        position: absolute;
+        display: block;
+        width: 80px;
+        height: 80px;
+    }
+
+    #puzzle span.number {
+        cursor: pointer;
+        font: bold 36px/80px Arial;
+        text-align: center;
+        text-shadow: -1px -1px 0 rgb(0 0 0 / 50%);
+        color: #fff;
+    }
+
+    #puzzle span.number.light {
+        background: #226666;
+    }
+
+    #puzzle span.number.dark {
+        background: #003333;
+    }
+
+    #controls {
+        margin-left: 36%;
+        margin-right: auto;
+    }
+
+    #controls button {
+        cursor: pointer;
+        outline: none;
+        padding: 10px 20px;
+        margin: 25px 2px;
+        border: 0;
+        border-radius: 4px;
+        background: #001F1F;
+        font: bold 14px Arial;
+        text-align: center;
+        text-transform: uppercase;
+        text-shadow: -1px -1px 0 rgb(0 0 0 / 50%);
+        color: #fff;
+    }
+    #controls select{
+        cursor: pointer;
+        outline: none;
+        padding: 10px 20px;
+        margin: 25px 2px;
+        border: 0;
+        border-radius: 4px;
+        background: #001F1F;
+        font: bold 14px Arial;
+        text-align: center;
+        text-transform: uppercase;
+        text-shadow: -1px -1px 0 rgb(0 0 0 / 50%);
+        color: #fff;
+    }
+
+    .notification {
+        justify-content: center;
+        align-items: center;
+        margin-left: 43%;
+        width: 40%;
+        height: 30px;
+    }
+
+    #message {
+        font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+        font-size: large;
+        margin-left: 20px;
+    }
+
+    .show-algos {
+        display: flex;
+        margin: auto;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .algo {
+        display: block;
+        text-align: center;
+        width: 25%;
+        height: 100px;
+        margin: auto;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .algo div {
+        margin-left: -20%;
+        margin-right: auto;
+        margin-top: 5px;
+    }
+
+    .algo button {
+        margin-top: 10px;
+        cursor: pointer;
+        outline: none;
+        padding: 10px 20px;
+        border: 0;
+        border-radius: 4px;
+        background: #001F1F;
+        font: bold 14px Arial;
+        text-align: center;
+        text-transform: uppercase;
+        text-shadow: -1px -1px 0 rgb(0 0 0 / 50%);
+        color: #fff;
+    }
+
+    .algo p {
+        font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+        font-size: medium;
+    }
+
+    .back {
+        width: 30%;
+        height: 40px;
+        display: flex;
+        margin: auto;
+        margin-top: 35px;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .back button {
+        width: 20%;
+        height: 100%;
+        cursor: pointer;
+        outline: none;
+        padding: 10px 20px;
+        border: 0;
+        border-radius: 4px;
+        background: #001F1F;
+        font: bold 14px Arial;
+        text-align: center;
+        text-transform: uppercase;
+        text-shadow: -1px -1px 0 rgb(0 0 0 / 50%);
+        color: #fff;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .memory {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+
+</html>
